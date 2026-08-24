@@ -20,7 +20,7 @@ func CloseAndDelete(f *os.File) {
 	if err := f.Close(); err != nil {
 		log.Warnf("error closing file %q: %s", f.Name(), err)
 	}
-	if err := os.Remove(f.Name()); err != nil {
+	if err := os.RemoveAll(filepath.Dir(f.Name())); err != nil {
 		log.Warnf("error removing file %q: %s", f.Name(), err)
 	}
 }
