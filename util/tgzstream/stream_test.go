@@ -14,7 +14,7 @@ import (
 func TestCloseAndDeleteRemovesTempDirectory(t *testing.T) {
 	// Given a file compressed into a fresh temp directory
 	appPath := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(appPath, "app.yaml"), []byte("kind: ConfigMap\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(appPath, "app.yaml"), []byte("kind: ConfigMap\n"), 0o600))
 
 	tgz, _, _, err := tgzstream.CompressFiles(appPath, nil, nil)
 	require.NoError(t, err)
