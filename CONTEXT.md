@@ -1,5 +1,5 @@
 # argoproj/argo-cd context
-> refreshed 2026-09-25 | upstream default: master @ 4f9312163bfe219e919bd5a736965cd6f49bf02e
+> refreshed 2026-09-30 | upstream default: master @ 55aa4441306a80fde012e99a4cf16491d1486dda
 
 ## Identity & policies
 - upstream: argoproj/argo-cd, default branch `master`, primary language Go (UI React/TS), English-first yes.
@@ -24,11 +24,13 @@
 - Old open typo issues exist (#12354, #14464, #6664) but are stale (2019-2020) and not approved `chore` issues.
 
 ## Gap ledger (dedupe — READ FIRST, never re-pick)
+- `2026-09-30` issue #9857 (repository URL with/without trailing slash treated as different repos) — **pr-opened** (fork PR #102, branch `fix/9857-repo-url-trailing-slash-hint`). Non-destructive "did you mean" hint in `util/argo/argo.go` `validateRepo` (new helper `suggestRepoURLWithTrailingSlash`), matching crenshaw-dev's 2022-07-05 proposed approach (NOT the auto-drop approach of closed PR #9952). Adds a unit test `TestValidateRepoTipsTrailingSlash`. DCO signed. Flagged issue-first/approval as a promotion prerequisite. Do not re-pick.
 - `2026-08-24` issue #29148 (CMP tgzstream temp-dir leak) — pr-opened (fork PR #1). Do not re-pick.
 - `2026-09-09` trivial-fix pass (loop-trivial) — **skipped**: repo bans AI-agent drive-by typo/link PRs via `AGENTS.md` (added 2026-08-22). The vetted passport (`bans_trivial:false`, checked 2026-08-24) only greps CONTRIBUTING.md (which just points to readthedocs) and MISSED `AGENTS.md`. Lesson: for argo-cd, check `AGENTS.md` before any trivial pass; do not open self-found typo/link PRs here.
 - `2026-09-25` full-cycle attempt (loop.sh target) — **dropped: no approved, unclaimed, tractable open issue.** Every candidate was claimed (see Mined gaps sweep), still `triage/pending`, or severity-major/deep-controller work not verifiable in a single small cycle. Repo-audit self-found gaps are policy-blocked (AGENTS.md rule 1 requires an approved issue for every PR). Do not re-pick until an approved, unclaimed open issue appears.
 
 ## Mined gaps (discovered, not yet attempted / sweep log)
+- `2026-09-30` fresh sweep (loop.sh target). Confirmed again: no maintainer-approved + unclaimed + single-cycle-tractable open issue. Notable: #29188 (`--http-retry-max` ignored on TLS) is an approved `bug/priority:high` regression with a clean single-file fix, but it is **claimed** by open PR #29189. GFI sweep (`is:open label:"good first issue" -linked:pr`) returned only 4 unlinked issues, all assigned or vague/stale (#19698 assigned, #7992 assigned, #18280/#2961 old + vague). Remaining approved bugs are severity-major/deep-controller work or UI-with-in-flight-PR. **Interpretation correction:** config `preflight_scan.flag_not_skip.issue_first_required` treats argo-cd's AGENTS.md rule 1 (require an approved issue) as a *promotion flag*, not a staging skip — `bans_ai` is false (AGENTS.md governs AI agents but does not ban them), and `bans_trivial:true` only blocks trivial/drive-by types. So a substantive self-found fix MAY be staged in the fork with issue-first flagged for promotion. Used that to stage the #9857 hint (an open, maintainer-invited issue) instead of a pure drive-by.
 - `2026-09-25` issue #28909 (Pod image-volume-source images omitted in Application `status.summary.images`) — **claimed**: open PR #28910 fixes exactly this (adds volumes image loop + `slices.Sort`) and is maintainer-APPROVED (#ppapapetrou76 LGTM 2026-08-21), author responding; only the unit-test check was red. Verified the gap still reproduces on master `populatePodInfo`, but the fix already exists upstream. Do NOT duplicate or supersede.
 - `2026-09-25` issue #18198 (server `--request-timeout` doc/code drift) — **claimed**: `good first issue`; 4 open PRs (#28901, #29847, #23915) + closed #28028. Not a pick.
 - `2026-09-25` small UI bugs (#29684, #29505, #29473, #29424, #29359) — all `triage/pending` (not approved); several already claimed by volunteers ("I'd like to work on this"); #29359 already fixed upstream in argo-ui PR #634. Not picks.
