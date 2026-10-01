@@ -1,5 +1,5 @@
 # argoproj/argo-cd context
-> refreshed 2026-09-30 | upstream default: master @ 55aa4441306a80fde012e99a4cf16491d1486dda
+> refreshed 2026-10-01 | upstream default: master @ c50c338ec74f4af0a7e04b6e39a50bc5816c99c7
 
 ## Identity & policies
 - upstream: argoproj/argo-cd, default branch `master`, primary language Go (UI React/TS), English-first yes.
@@ -26,6 +26,7 @@
 ## Gap ledger (dedupe — READ FIRST, never re-pick)
 - `2026-09-30` issue #9857 (repository URL with/without trailing slash treated as different repos) — **pr-opened** (fork PR #102, branch `fix/9857-repo-url-trailing-slash-hint`). Non-destructive "did you mean" hint in `util/argo/argo.go` `validateRepo` (new helper `suggestRepoURLWithTrailingSlash`), matching crenshaw-dev's 2022-07-05 proposed approach (NOT the auto-drop approach of closed PR #9952). Adds a unit test `TestValidateRepoTipsTrailingSlash`. DCO signed. Flagged issue-first/approval as a promotion prerequisite. Do not re-pick.
 - `2026-08-24` issue #29148 (CMP tgzstream temp-dir leak) — pr-opened (fork PR #1). Do not re-pick.
+- `2026-10-01` trivial-fix pass (loop-trivial) — **skipped: repo bans trivial/drive-by PRs.** Re-verified LIVE against upstream master @ c50c338e: repo-root `AGENTS.md` rule 1 (an existing, open AND approved issue is required for every PR) and rule 2 (no unsolicited PRs that only contain minor stylistic changes, variable renames, or typo fixes unless tied to an approved `chore` issue; violations "immediately rejected, closed, and flagged as spam") are both still present, and the vetted passport now carries `bans_trivial:true` (checked 2026-09-30). Live corroboration of the trivial search: GitHub code search for recieve/seperate/occured/definately/adress/occurence/neccessary/thier/untill all 0 hits in-repo, matching the 2026-09-09 sweep; no open unlinked `chore` or `docs` issue exists to anchor a doc cleanup (search total_count 0). Even if >=3 genuine typos existed, the policy gate blocks that PR TYPE here (config `skip_if_bans_trivial_prs`). Lesson: skip trivial passes on argo-cd unconditionally; revisit only for a substantive fix tied to an approved issue.
 - `2026-09-09` trivial-fix pass (loop-trivial) — **skipped**: repo bans AI-agent drive-by typo/link PRs via `AGENTS.md` (added 2026-08-22). The vetted passport (`bans_trivial:false`, checked 2026-08-24) only greps CONTRIBUTING.md (which just points to readthedocs) and MISSED `AGENTS.md`. Lesson: for argo-cd, check `AGENTS.md` before any trivial pass; do not open self-found typo/link PRs here.
 - `2026-09-25` full-cycle attempt (loop.sh target) — **dropped: no approved, unclaimed, tractable open issue.** Every candidate was claimed (see Mined gaps sweep), still `triage/pending`, or severity-major/deep-controller work not verifiable in a single small cycle. Repo-audit self-found gaps are policy-blocked (AGENTS.md rule 1 requires an approved issue for every PR). Do not re-pick until an approved, unclaimed open issue appears.
 
