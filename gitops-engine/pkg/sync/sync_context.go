@@ -106,7 +106,7 @@ func WithInitialState(phase common.OperationPhase, message string, results []com
 		ctx.syncRes = map[string]common.ResourceSyncResult{}
 		ctx.startedAt = startedAt.Time
 		for i := range results {
-			ctx.syncRes[resourceResultKey(results[i].ResourceKey, results[i].SyncPhase)] = results[i]
+			ctx.syncRes[resourceResultKey(results[i].ResourceKey, results[i].SyncPhase, results[i].HookType)] = results[i]
 		}
 	}
 }
@@ -1827,8 +1827,8 @@ func (sc *syncContext) setResourceResult(task *syncTask, syncStatus common.Resul
 	}
 }
 
-func resourceResultKey(key kubeutil.ResourceKey, phase common.SyncPhase) string {
-	return fmt.Sprintf("%s:%s", key.String(), phase)
+func resourceResultKey(key kubeutil.ResourceKey, phase common.SyncPhase, hookType common.HookType) string {
+	return fmt.Sprintf("%s:%s:%s", key.String(), phase, hookType)
 }
 
 type stateSync struct {
