@@ -21,6 +21,7 @@ import (
 	gitmocks "github.com/argoproj/argo-cd/v3/util/git/mocks"
 	"github.com/argoproj/argo-cd/v3/util/gpgsign"
 	"github.com/argoproj/argo-cd/v3/util/gpgsign/gpgsigntest"
+	"github.com/argoproj/argo-cd/v3/util/settings"
 )
 
 func Test_CommitHydratedManifests(t *testing.T) {
@@ -641,6 +642,45 @@ func Test_CommitHydratedManifests_Signing_FullFlow(t *testing.T) {
 	require.True(t, found, "unexpected signature output: %q", out)
 	assert.Contains(t, []string{git.SignatureStatusGood, git.SignatureStatusGoodUnknownTrust}, status)
 	assert.True(t, signingCfg.MatchesSigningKey(key), "commit signed by unexpected key %q", key)
+}
+
+// Test_CommitHydratedManifests_CrossRepoReadme covers hydrating into a repo
+// that differs from the DRY source repo: the generated README.md and
+// hydrator.metadata must point at the DRY source repo, not the destination.
+func Test_CommitHydratedManifests_CrossRepoReadme(t *testing.T) {
+	origin := newOriginRepo(t)
+	service := NewService(git.NoopCredsStore{}, metrics.NewMetricsServer(), nil)
+
+	const drySourceRepoURL = "https://github.com/argoproj/argocd-example-apps.git"
+	destinationRepoURL := "file://" + origin
+
+	req := &apiclient.CommitHydratedManifestsRequest{
+		Repo:             &v1alpha1.Repository{Repo: destinationRepoURL},
+		DrySourceRepoURL: drySourceRepoURL,
+		TargetBranch:     "hydrated",
+		SyncBranch:       "env/test",
+		CommitMessage:    "hydrate manifests",
+		DrySha:           "0123456789abcdef0123456789abcdef01234567",
+		ReadmeMessage:    settings.DefaultManifestHydrationReadmeTemplate,
+		Paths: []*apiclient.PathDetails{{
+			Path: ".",
+			Manifests: []*apiclient.HydratedManifestDetails{{
+				ManifestJSON: `{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"x"}}`,
+			}},
+		}},
+	}
+
+	resp, err := service.CommitHydratedManifests(t.Context(), req)
+	require.NoError(t, err)
+	require.NotEmpty(t, resp.HydratedSha)
+
+	for _, file := range []string{"README.md", "hydrator.metadata"} {
+		cmd := exec.CommandContext(t.Context(), "git", "-C", origin, "show", "hydrated:"+file)
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "git show %s: %s", file, out)
+		assert.Contains(t, string(out), drySourceRepoURL, "%s should point at the DRY source repo", file)
+		assert.NotContains(t, string(out), destinationRepoURL, "%s should not point at the destination repo", file)
+	}
 }
 
 // newOriginRepo creates a non-bare git repo seeded with an empty initial commit

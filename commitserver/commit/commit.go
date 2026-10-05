@@ -177,7 +177,14 @@ func (s *Service) handleCommitRequest(ctx context.Context, logCtx *log.Entry, r 
 	}
 
 	logCtx.Debug("Writing manifests")
-	shouldCommit, err := WriteForPaths(ctx, root, r.Repo.Repo, r.DrySha, r.DryCommitMetadata, r.Paths, gitClient, r.ReadmeMessage)
+	// The README and hydrator.metadata files must point at the DRY source repo, which can differ from the
+	// destination repo when hydrating across repositories. Fall back to the destination repo URL for requests
+	// that don't set the field.
+	drySourceRepoURL := r.DrySourceRepoURL
+	if drySourceRepoURL == "" {
+		drySourceRepoURL = r.Repo.Repo
+	}
+	shouldCommit, err := WriteForPaths(ctx, root, drySourceRepoURL, r.DrySha, r.DryCommitMetadata, r.Paths, gitClient, r.ReadmeMessage)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to write manifests: %w", err)
 	}
