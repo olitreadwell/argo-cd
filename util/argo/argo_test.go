@@ -503,6 +503,77 @@ func TestValidateRepo(t *testing.T) {
 	assert.Equal(t, kustomizeOptions, receivedRequest.KustomizeOptions)
 }
 
+// Regression test for https://github.com/argoproj/argo-cd/issues/9857: an
+// application referring to a repository URL that differs from the configured
+// one only by a trailing slash should get an error that points at the
+// configured URL.
+func TestValidateRepoTipsTrailingSlash(t *testing.T) {
+	t.Parallel()
+	repoPath, err := filepath.Abs("./../..")
+	require.NoError(t, err)
+
+	configuredRepoURL := "file://" + repoPath
+	requestedRepoURL := configuredRepoURL + "/"
+
+	apiResources := []kube.APIResourceInfo{}
+	kubeVersion := "v1.16"
+	cluster := &argoappv1.Cluster{Server: "sample server"}
+	app := &argoappv1.Application{
+		Spec: argoappv1.ApplicationSpec{
+			Source: &argoappv1.ApplicationSource{
+				RepoURL: requestedRepoURL,
+			},
+			Destination: argoappv1.ApplicationDestination{
+				Server:    cluster.Server,
+				Namespace: "default",
+			},
+		},
+	}
+	proj := &argoappv1.AppProject{
+		Spec: argoappv1.AppProjectSpec{
+			SourceRepos: []string{"*"},
+		},
+	}
+
+	// No repository credential matches the requested URL, so the DB hands back a
+	// credential-less repository, exactly as it does in the reported bug.
+	repo := &argoappv1.Repository{Repo: requestedRepoURL, Type: "git"}
+
+	repoClient := &mocks.RepoServerServiceClient{}
+	repoClient.EXPECT().TestRepository(mock.Anything, &apiclient.TestRepositoryRequest{
+		Repo: repo,
+	}).Return(nil, errors.New("authentication required")).Maybe()
+	repoClientSet := &mocks.Clientset{RepoServerServiceClient: repoClient}
+
+	db := &dbmocks.ArgoDB{}
+	db.EXPECT().GetRepository(mock.Anything, requestedRepoURL, "").Return(repo, nil).Maybe()
+	db.EXPECT().ListHelmRepositories(mock.Anything).Return([]*argoappv1.Repository{}, nil).Maybe()
+	db.EXPECT().ListOCIRepositories(mock.Anything).Return([]*argoappv1.Repository{}, nil).Maybe()
+	db.EXPECT().GetCluster(mock.Anything, cluster.Server).Return(cluster, nil).Maybe()
+	db.EXPECT().GetAllHelmRepositoryCredentials(mock.Anything).Return(nil, nil).Maybe()
+	db.EXPECT().GetAllOCIRepositoryCredentials(mock.Anything).Return([]*argoappv1.RepoCreds{}, nil).Maybe()
+	db.EXPECT().ListRepositories(mock.Anything).Return([]*argoappv1.Repository{
+		{Repo: configuredRepoURL},
+		{Repo: "https://github.com/argoproj/argo-cd.git"},
+	}, nil).Maybe()
+
+	cm := corev1.ConfigMap{
+		Name:      "argocd-cm",
+		Namespace: test.FakeArgoCDNamespace,
+		Labels: map[string]string{
+			"app.kubernetes.io/part-of": "argocd",
+		},
+	}
+	kubeClient := fake.NewClientset(&cm)
+	settingsMgr := settings.NewSettingsManager(t.Context(), kubeClient, test.FakeArgoCDNamespace)
+
+	conditions, err := ValidateRepo(t.Context(), app, repoClientSet, db, &kubetest.MockKubectlCmd{Version: kubeVersion, APIResources: apiResources}, proj, settingsMgr)
+	require.NoError(t, err)
+	require.Len(t, conditions, 1)
+	assert.Contains(t, conditions[0].Message, "repository not accessible")
+	assert.Contains(t, conditions[0].Message, fmt.Sprintf("did you mean %q?", configuredRepoURL))
+}
+
 func TestValidateRepo_SourceHydrator(t *testing.T) {
 	t.Parallel()
 	repoPath, err := filepath.Abs("./../..")

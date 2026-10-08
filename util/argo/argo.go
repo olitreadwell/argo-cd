@@ -336,6 +336,37 @@ func TestRepoWithKnownType(ctx context.Context, repoClient apiclient.RepoServerS
 	return nil
 }
 
+// suggestRepoURLWithTrailingSlash returns a repository URL configured for the
+// given project that is identical to repoURL apart from a trailing slash, or an
+// empty string when there is no such repository. It backs the "did you mean"
+// hint shown when an application references a repository that is only
+// distinguishable from a configured one by a trailing slash.
+// See https://github.com/argoproj/argo-cd/issues/9857.
+func suggestRepoURLWithTrailingSlash(ctx context.Context, argoDB db.ArgoDB, project, repoURL string) string {
+	trimmedURL := strings.TrimSuffix(repoURL, "/")
+	if trimmedURL == "" {
+		return ""
+	}
+	repos, err := argoDB.ListRepositories(ctx)
+	if err != nil {
+		return ""
+	}
+	for _, repo := range repos {
+		// An exact match is not a suggestion, and a repository is only available
+		// to the application if it is global or scoped to its project.
+		if repo == nil || repo.Repo == repoURL {
+			continue
+		}
+		if repo.Project != "" && repo.Project != project {
+			continue
+		}
+		if strings.TrimSuffix(repo.Repo, "/") == trimmedURL {
+			return repo.Repo
+		}
+	}
+	return ""
+}
+
 // ValidateRepo validates the repository specified in application spec. Following is checked:
 // * the repository is accessible
 // * the path contains valid manifests
@@ -502,9 +533,13 @@ func validateRepo(ctx context.Context,
 		repoAccessible := false
 
 		if errMessage != "" {
+			message := fmt.Sprintf("repository not accessible: %v", errMessage)
+			if suggestion := suggestRepoURLWithTrailingSlash(ctx, db, proj.Name, source.RepoURL); suggestion != "" {
+				message = fmt.Sprintf("%s (did you mean %q?)", message, suggestion)
+			}
 			conditions = append(conditions, argoappv1.ApplicationCondition{
 				Type:    argoappv1.ApplicationConditionInvalidSpecError,
-				Message: fmt.Sprintf("repository not accessible: %v", errMessage),
+				Message: message,
 			})
 		} else {
 			repoAccessible = true
