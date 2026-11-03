@@ -198,7 +198,7 @@ func TestWebhookHandler(t *testing.T) {
 			headerKey:          "X-Gitlab-Event",
 			headerValue:        "Merge Request Hook",
 			payloadFile:        "gitlab-merge-request-open-event.json",
-			effectedAppSets:    []string{"pull-request-gitlab", "plugin", "matrix-pull-request-github-plugin"},
+			effectedAppSets:    []string{"pull-request-gitlab", "pull-request-gitlab-path", "pull-request-gitlab-path-case", "plugin", "matrix-pull-request-github-plugin"},
 			expectedStatusCode: http.StatusOK,
 			expectedRefresh:    true,
 		},
@@ -207,7 +207,7 @@ func TestWebhookHandler(t *testing.T) {
 			headerKey:          "X-Gitlab-Event",
 			headerValue:        "Merge Request Hook",
 			payloadFile:        "gitlab-merge-request-approval-event.json",
-			effectedAppSets:    []string{"pull-request-gitlab", "plugin"},
+			effectedAppSets:    []string{"pull-request-gitlab", "pull-request-gitlab-path", "pull-request-gitlab-path-case", "plugin"},
 			expectedStatusCode: http.StatusOK,
 			expectedRefresh:    false,
 		},
@@ -270,6 +270,9 @@ func TestWebhookHandler(t *testing.T) {
 				fakeAppWithGitGeneratorWithRevision("git-gitlab-semver-nomatch", namespace, "https://gitlab.com/group/name", "2.*"),
 				fakeAppWithGithubPullRequestGenerator("pull-request-github", namespace, "CodErTOcat", "Hello-World"),
 				fakeAppWithGitlabPullRequestGenerator("pull-request-gitlab", namespace, "100500"),
+				fakeAppWithGitlabPullRequestGenerator("pull-request-gitlab-path", namespace, "group/name"),
+				fakeAppWithGitlabPullRequestGenerator("pull-request-gitlab-path-case", namespace, "Group/Name"),
+				fakeAppWithGitlabPullRequestGenerator("pull-request-gitlab-path-nomatch", namespace, "group/other"),
 				fakeAppWithAzureDevOpsPullRequestGenerator("pull-request-azure-devops", namespace, "DefaultCollection", "Fabrikam"),
 				fakeAppWithPluginGenerator("plugin", namespace),
 				fakeAppWithOciGenerator("oci-ghcr", namespace, "oci://ghcr.io/org/image", "1.0.0"),
@@ -445,6 +448,68 @@ func TestWebhookHandlerRejectsRequests(t *testing.T) {
 			assert.Equal(t, test.expectedBody, strings.TrimSpace(w.Body.String()))
 		})
 	}
+}
+
+// TestParserOptionsParity makes sure every webhook event the Argo CD API server
+// handles is also handled by the ApplicationSet webhook, so a provider added to one
+// handler is not silently missing from the other.
+func TestParserOptionsParity(t *testing.T) {
+	// Providers the Argo CD webhook handles that the ApplicationSet webhook does not
+	// yet. Delete an entry when adding that provider to appSetParserOptions.
+	knownGaps := map[string]bool{
+		"bitbucket":       true,
+		"bitbucketserver": true,
+		"gogs":            true,
+		"harbor":          true,
+		"dockerhub":       true,
+	}
+
+	argocdEvents := parserEvents(webhook.ArgoCDParserOptions())
+	appSetEvents := parserEvents(appSetParserOptions())
+	for event := range argocdEvents {
+		provider, _, _ := strings.Cut(event, ":")
+		if knownGaps[provider] {
+			assert.NotContains(t, appSetEvents, event, "the ApplicationSet webhook handles %s now, remove %q from knownGaps", event, provider)
+			continue
+		}
+		assert.Contains(t, appSetEvents, event, "the Argo CD webhook handles %s but the ApplicationSet webhook does not", event)
+	}
+}
+
+// parserEvents flattens opts into "provider:event" keys, e.g. "github:push".
+func parserEvents(opts webhook.ParserOptions) map[string]bool {
+	events := map[string]bool{}
+	add := func(provider string, event any) {
+		events[fmt.Sprintf("%s:%v", provider, event)] = true
+	}
+	for _, e := range opts.AzureDevOpsEvents {
+		add("azuredevops", e)
+	}
+	for _, e := range opts.GogsEvents {
+		add("gogs", e)
+	}
+	for _, e := range opts.GitHubEvents {
+		add("github", e)
+	}
+	for _, e := range opts.GitLabEvents {
+		add("gitlab", e)
+	}
+	for _, e := range opts.BitbucketEvents {
+		add("bitbucket", e)
+	}
+	for _, e := range opts.BitbucketServerEvents {
+		add("bitbucketserver", e)
+	}
+	if opts.Harbor {
+		add("harbor", "registry")
+	}
+	if opts.GHCR {
+		add("ghcr", "registry")
+	}
+	if opts.DockerHub {
+		add("dockerhub", "registry")
+	}
+	return events
 }
 
 func TestGenRevisionHasChanged(t *testing.T) {
